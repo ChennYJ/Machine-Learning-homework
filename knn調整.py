@@ -1,4 +1,4 @@
-# Assignment 4 - KNN 詳細超參數分析版本
+# Assignment 4 - KNN超參數
 
 import pandas as pd
 import numpy as np
