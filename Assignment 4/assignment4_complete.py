@@ -1,4 +1,4 @@
-# Assignment 4 - KNN、CART、C4.5 完整比較
+# Assignment 4 - KNN、CART、C4.5 比較
 
 import pandas as pd
 import numpy as np
@@ -10,7 +10,7 @@ import seaborn as sns
 from sklearn.preprocessing import StandardScaler
 
 # 模型相關
-from sklearn.model_selection import train_test_split, GridSearchCV, cross_val_score
+from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn import tree
@@ -18,14 +18,13 @@ from sklearn import tree
 # 評估指標
 from sklearn.metrics import (accuracy_score, f1_score, precision_score, 
                              recall_score, roc_auc_score, confusion_matrix,
-                             classification_report, roc_curve)
+                             roc_curve)
 
-# 設定中文字型
 plt.rcParams['font.sans-serif'] = ['Arial Unicode MS', 'Microsoft JhengHei', 'SimHei']
 plt.rcParams['axes.unicode_minus'] = False
 
 print("=" * 80)
-print("Assignment 4: KNN、CART、C4.5 模型比較分析（改進版 - 加入標準化）")
+print("Assignment 4: KNN、CART、C4.5 模型比較分析")
 print("使用三個 Random Seeds: 4, 40, 400")
 print("=" * 80)
 
@@ -79,15 +78,6 @@ print(f"\n特徵數量: {X.shape[1]}")
 print(f"類別分布:\n{y.value_counts()}")
 
 # ============================================================
-# ★ 新增：檢查特徵的數值範圍
-# ============================================================
-print("\n" + "=" * 80)
-print("特徵數值範圍分析")
-print("=" * 80)
-print("\n未標準化前的特徵統計:")
-print(X.describe().loc[['min', 'max', 'mean', 'std']])
-
-# ============================================================
 # 2. 定義三個 Random Seeds
 # ============================================================
 SEEDS = [4, 40, 400]
@@ -95,56 +85,60 @@ print(f"\n使用的 Random Seeds: {SEEDS}")
 
 # 儲存所有結果
 all_results = {
-    'KNN_原始': {},      # 不標準化
-    'KNN_標準化': {},    # 標準化
+    'KNN_原始': {},
+    'KNN_標準化': {},
     'CART': {},
     'C4.5': {}
 }
 
-# ============================================================
-# 3. 對每個 Seed 進行實驗
-# ============================================================
-
+# 為每個 seed 準備資料分割
+data_splits = {}
 for seed in SEEDS:
-    print("\n" + "=" * 80)
-    print(f"Random Seed = {seed}")
-    print("=" * 80)
-    
-    # 資料分割 (80% 訓練, 20% 測試)
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.2, random_state=seed, stratify=y
     )
     
-    print(f"訓練集大小: {X_train.shape}")
-    print(f"測試集大小: {X_test.shape}")
-    
-    # ========================================
-    # ★ 標準化處理（只針對 KNN）
-    # ========================================
+    # 標準化處理
     scaler = StandardScaler()
     X_train_scaled = scaler.fit_transform(X_train)
     X_test_scaled = scaler.transform(X_test)
     
-    # 轉回 DataFrame 以保留欄位名稱（方便檢查）
-    X_train_scaled_df = pd.DataFrame(X_train_scaled, columns=X.columns, index=X_train.index)
-    X_test_scaled_df = pd.DataFrame(X_test_scaled, columns=X.columns, index=X_test.index)
-    
-    print("\n標準化後的特徵統計 (前 5 個特徵):")
-    print(X_train_scaled_df.iloc[:, :5].describe().loc[['mean', 'std']])
-    
-    # ========================================
-    # KNN 模型 - 原始數據（不標準化）
-    # ========================================
-    print("\n[模型 1a] K-Nearest Neighbors (原始數據 - 不標準化)")
-    print("-" * 40)
-    
-    knn_param_grid = {
-        'n_neighbors': [3, 5, 7, 9, 11, 15, 20],
-        'weights': ['uniform', 'distance'],
-        'metric': ['euclidean', 'manhattan']
+    data_splits[seed] = {
+        'X_train': X_train,
+        'X_test': X_test,
+        'X_train_scaled': X_train_scaled,
+        'X_test_scaled': X_test_scaled,
+        'y_train': y_train,
+        'y_test': y_test
     }
+
+# ============================================================
+# 3. KNN 模型（原始數據）- 跑所有 Seeds
+# ============================================================
+print("\n" + "=" * 80)
+print("模型 1a: K-Nearest Neighbors (KNN) - 原始數據（不標準化）")
+print("=" * 80)
+
+knn_param_grid = {
+    'n_neighbors': [3, 5, 7, 9, 11, 15, 20],
+    'weights': ['uniform', 'distance'],
+    'metric': ['euclidean', 'manhattan']
+}
+
+for seed in SEEDS:
+    print(f"\n{'─' * 80}")
+    print(f"Random Seed = {seed}")
+    print(f"{'─' * 80}")
     
-    knn_grid_original = GridSearchCV(
+    X_train = data_splits[seed]['X_train']
+    X_test = data_splits[seed]['X_test']
+    y_train = data_splits[seed]['y_train']
+    y_test = data_splits[seed]['y_test']
+    
+    print(f"訓練集大小: {X_train.shape}, 測試集大小: {X_test.shape}")
+    
+    # GridSearchCV
+    knn_grid = GridSearchCV(
         KNeighborsClassifier(),
         knn_param_grid,
         cv=5,
@@ -152,49 +146,109 @@ for seed in SEEDS:
         n_jobs=-1
     )
     
-    knn_grid_original.fit(X_train, y_train)
-    knn_best_model_original = knn_grid_original.best_estimator_
+    knn_grid.fit(X_train, y_train)
+    knn_best_model = knn_grid.best_estimator_
     
-    print(f"最佳參數: {knn_grid_original.best_params_}")
+    print(f"最佳參數: {knn_grid.best_params_}")
+    print(f"最佳 CV 分數: {knn_grid.best_score_:.4f}")
     
     # 評估
-    y_train_pred_knn_orig = knn_best_model_original.predict(X_train)
-    y_test_pred_knn_orig = knn_best_model_original.predict(X_test)
-    y_test_proba_knn_orig = knn_best_model_original.predict_proba(X_test)[:, 1]
+    y_train_pred = knn_best_model.predict(X_train)
+    y_test_pred = knn_best_model.predict(X_test)
+    y_test_proba = knn_best_model.predict_proba(X_test)[:, 1]
     
-    knn_orig_train_acc = accuracy_score(y_train, y_train_pred_knn_orig)
-    knn_orig_test_acc = accuracy_score(y_test, y_test_pred_knn_orig)
-    knn_orig_test_f1 = f1_score(y_test, y_test_pred_knn_orig)
-    knn_orig_test_pre = precision_score(y_test, y_test_pred_knn_orig)
-    knn_orig_test_rec = recall_score(y_test, y_test_pred_knn_orig)
-    knn_orig_test_auc = roc_auc_score(y_test, y_test_proba_knn_orig)
+    train_acc = accuracy_score(y_train, y_train_pred)
+    test_acc = accuracy_score(y_test, y_test_pred)
+    test_f1 = f1_score(y_test, y_test_pred)
+    test_pre = precision_score(y_test, y_test_pred)
+    test_rec = recall_score(y_test, y_test_pred)
+    test_auc = roc_auc_score(y_test, y_test_proba)
     
-    cm_knn_orig = confusion_matrix(y_test, y_test_pred_knn_orig)
-    tn, fp, fn, tp = cm_knn_orig.ravel()
-    knn_orig_test_spe = tn / (tn + fp)
+    cm = confusion_matrix(y_test, y_test_pred)
+    tn, fp, fn, tp = cm.ravel()
+    test_spe = tn / (tn + fp)
     
-    print(f"測試集準確率: {knn_orig_test_acc:.4f} ({knn_orig_test_acc*100:.2f}%)")
-    print(f"測試集 F1-Score: {knn_orig_test_f1:.4f} ({knn_orig_test_f1*100:.2f}%)")
-    print(f"測試集 AUC: {knn_orig_test_auc:.4f}")
+    print(f"\n訓練集準確率: {train_acc:.4f} ({train_acc*100:.2f}%)")
+    print(f"測試集準確率: {test_acc:.4f} ({test_acc*100:.2f}%)")
+    print(f"測試集 F1-Score: {test_f1:.4f} ({test_f1*100:.2f}%)")
+    print(f"測試集 Precision: {test_pre:.4f} ({test_pre*100:.2f}%)")
+    print(f"測試集 Sensitivity: {test_rec:.4f} ({test_rec*100:.2f}%)")
+    print(f"測試集 Specificity: {test_spe:.4f} ({test_spe*100:.2f}%)")
+    print(f"測試集 AUC: {test_auc:.4f}")
+    
+    print(f"\n混淆矩陣:")
+    print(f"  TN={tn}, FP={fp}")
+    print(f"  FN={fn}, TP={tp}")
     
     all_results['KNN_原始'][seed] = {
-        'train_acc': knn_orig_train_acc,
-        'test_acc': knn_orig_test_acc,
-        'test_f1': knn_orig_test_f1,
-        'test_precision': knn_orig_test_pre,
-        'test_recall': knn_orig_test_rec,
-        'test_specificity': knn_orig_test_spe,
-        'test_auc': knn_orig_test_auc,
-        'best_params': knn_grid_original.best_params_,
-        'confusion_matrix': cm_knn_orig
+        'train_acc': train_acc,
+        'test_acc': test_acc,
+        'test_f1': test_f1,
+        'test_precision': test_pre,
+        'test_recall': test_rec,
+        'test_specificity': test_spe,
+        'test_auc': test_auc,
+        'best_params': knn_grid.best_params_,
+        'confusion_matrix': cm,
+        'y_test': y_test,
+        'y_test_pred': y_test_pred,
+        'y_test_proba': y_test_proba
     }
+
+# KNN 原始數據結果彙整表格
+print("\n" + "=" * 80)
+print("KNN 原始數據結果彙整")
+print("=" * 80)
+
+knn_orig_summary = []
+for seed in SEEDS:
+    result = all_results['KNN_原始'][seed]
+    knn_orig_summary.append({
+        'Seed': seed,
+        'Test_ACC (%)': result['test_acc'] * 100,
+        'Test_F1 (%)': result['test_f1'] * 100,
+        'Test_Precision (%)': result['test_precision'] * 100,
+        'Test_Sensitivity (%)': result['test_recall'] * 100,
+        'Test_Specificity (%)': result['test_specificity'] * 100,
+        'Test_AUC': result['test_auc']
+    })
+
+knn_orig_avg_acc = np.mean([r['test_acc'] for r in all_results['KNN_原始'].values()])
+knn_orig_avg_f1 = np.mean([r['test_f1'] for r in all_results['KNN_原始'].values()])
+
+knn_orig_summary.append({
+    'Seed': 'Average',
+    'Test_ACC (%)': knn_orig_avg_acc * 100,
+    'Test_F1 (%)': knn_orig_avg_f1 * 100,
+    'Test_Precision (%)': np.mean([r['test_precision'] for r in all_results['KNN_原始'].values()]) * 100,
+    'Test_Sensitivity (%)': np.mean([r['test_recall'] for r in all_results['KNN_原始'].values()]) * 100,
+    'Test_Specificity (%)': np.mean([r['test_specificity'] for r in all_results['KNN_原始'].values()]) * 100,
+    'Test_AUC': np.mean([r['test_auc'] for r in all_results['KNN_原始'].values()])
+})
+
+knn_orig_df = pd.DataFrame(knn_orig_summary)
+print("\n" + knn_orig_df.to_string(index=False))
+
+# ============================================================
+# 4. KNN 模型（標準化數據）- 所有Seeds
+# ============================================================
+print("\n\n" + "=" * 80)
+print("模型 1b: K-Nearest Neighbors (KNN) - 標準化數據")
+print("=" * 80)
+
+for seed in SEEDS:
+    print(f"\n{'─' * 80}")
+    print(f"Random Seed = {seed}")
+    print(f"{'─' * 80}")
     
-    # ========================================
-    # KNN 模型 - 標準化數據
-    # ========================================
-    print("\n[模型 1b] K-Nearest Neighbors (標準化數據) ★")
-    print("-" * 40)
+    X_train_scaled = data_splits[seed]['X_train_scaled']
+    X_test_scaled = data_splits[seed]['X_test_scaled']
+    y_train = data_splits[seed]['y_train']
+    y_test = data_splits[seed]['y_test']
     
+    print(f"訓練集大小: {X_train_scaled.shape}, 測試集大小: {X_test_scaled.shape}")
+    
+    # GridSearchCV
     knn_grid_scaled = GridSearchCV(
         KNeighborsClassifier(),
         knn_param_grid,
@@ -207,59 +261,133 @@ for seed in SEEDS:
     knn_best_model_scaled = knn_grid_scaled.best_estimator_
     
     print(f"最佳參數: {knn_grid_scaled.best_params_}")
+    print(f"最佳 CV 分數: {knn_grid_scaled.best_score_:.4f}")
     
     # 評估
-    y_train_pred_knn_scaled = knn_best_model_scaled.predict(X_train_scaled)
-    y_test_pred_knn_scaled = knn_best_model_scaled.predict(X_test_scaled)
-    y_test_proba_knn_scaled = knn_best_model_scaled.predict_proba(X_test_scaled)[:, 1]
+    y_train_pred = knn_best_model_scaled.predict(X_train_scaled)
+    y_test_pred = knn_best_model_scaled.predict(X_test_scaled)
+    y_test_proba = knn_best_model_scaled.predict_proba(X_test_scaled)[:, 1]
     
-    knn_scaled_train_acc = accuracy_score(y_train, y_train_pred_knn_scaled)
-    knn_scaled_test_acc = accuracy_score(y_test, y_test_pred_knn_scaled)
-    knn_scaled_test_f1 = f1_score(y_test, y_test_pred_knn_scaled)
-    knn_scaled_test_pre = precision_score(y_test, y_test_pred_knn_scaled)
-    knn_scaled_test_rec = recall_score(y_test, y_test_pred_knn_scaled)
-    knn_scaled_test_auc = roc_auc_score(y_test, y_test_proba_knn_scaled)
+    train_acc = accuracy_score(y_train, y_train_pred)
+    test_acc = accuracy_score(y_test, y_test_pred)
+    test_f1 = f1_score(y_test, y_test_pred)
+    test_pre = precision_score(y_test, y_test_pred)
+    test_rec = recall_score(y_test, y_test_pred)
+    test_auc = roc_auc_score(y_test, y_test_proba)
     
-    cm_knn_scaled = confusion_matrix(y_test, y_test_pred_knn_scaled)
-    tn, fp, fn, tp = cm_knn_scaled.ravel()
-    knn_scaled_test_spe = tn / (tn + fp)
+    cm = confusion_matrix(y_test, y_test_pred)
+    tn, fp, fn, tp = cm.ravel()
+    test_spe = tn / (tn + fp)
     
-    print(f"測試集準確率: {knn_scaled_test_acc:.4f} ({knn_scaled_test_acc*100:.2f}%)")
-    print(f"測試集 F1-Score: {knn_scaled_test_f1:.4f} ({knn_scaled_test_f1*100:.2f}%)")
-    print(f"測試集 AUC: {knn_scaled_test_auc:.4f}")
+    print(f"\n訓練集準確率: {train_acc:.4f} ({train_acc*100:.2f}%)")
+    print(f"測試集準確率: {test_acc:.4f} ({test_acc*100:.2f}%)")
+    print(f"測試集 F1-Score: {test_f1:.4f} ({test_f1*100:.2f}%)")
+    print(f"測試集 Precision: {test_pre:.4f} ({test_pre*100:.2f}%)")
+    print(f"測試集 Sensitivity: {test_rec:.4f} ({test_rec*100:.2f}%)")
+    print(f"測試集 Specificity: {test_spe:.4f} ({test_spe*100:.2f}%)")
+    print(f"測試集 AUC: {test_auc:.4f}")
     
-    # 計算改進幅度
-    improvement = (knn_scaled_test_acc - knn_orig_test_acc) * 100
-    print(f"\n★ 標準化後準確率提升: {improvement:+.2f}%")
+    print(f"\n混淆矩陣:")
+    print(f"  TN={tn}, FP={fp}")
+    print(f"  FN={fn}, TP={tp}")
+    
+    # 計算與原始數據的改進幅度
+    orig_acc = all_results['KNN_原始'][seed]['test_acc']
+    improvement = (test_acc - orig_acc) * 100
+    print(f"\n 相比原始數據，準確率提升: {improvement:+.2f}%")
     
     all_results['KNN_標準化'][seed] = {
-        'train_acc': knn_scaled_train_acc,
-        'test_acc': knn_scaled_test_acc,
-        'test_f1': knn_scaled_test_f1,
-        'test_precision': knn_scaled_test_pre,
-        'test_recall': knn_scaled_test_rec,
-        'test_specificity': knn_scaled_test_spe,
-        'test_auc': knn_scaled_test_auc,
+        'train_acc': train_acc,
+        'test_acc': test_acc,
+        'test_f1': test_f1,
+        'test_precision': test_pre,
+        'test_recall': test_rec,
+        'test_specificity': test_spe,
+        'test_auc': test_auc,
         'best_params': knn_grid_scaled.best_params_,
-        'confusion_matrix': cm_knn_scaled,
+        'confusion_matrix': cm,
         'y_test': y_test,
-        'y_test_pred': y_test_pred_knn_scaled,
-        'y_test_proba': y_test_proba_knn_scaled
+        'y_test_pred': y_test_pred,
+        'y_test_proba': y_test_proba
     }
+
+# KNN 標準化數據結果彙整表格
+print("\n" + "=" * 80)
+print("KNN 標準化數據結果彙整")
+print("=" * 80)
+
+knn_scaled_summary = []
+for seed in SEEDS:
+    result = all_results['KNN_標準化'][seed]
+    knn_scaled_summary.append({
+        'Seed': seed,
+        'Test_ACC (%)': result['test_acc'] * 100,
+        'Test_F1 (%)': result['test_f1'] * 100,
+        'Test_Precision (%)': result['test_precision'] * 100,
+        'Test_Sensitivity (%)': result['test_recall'] * 100,
+        'Test_Specificity (%)': result['test_specificity'] * 100,
+        'Test_AUC': result['test_auc']
+    })
+
+knn_scaled_avg_acc = np.mean([r['test_acc'] for r in all_results['KNN_標準化'].values()])
+knn_scaled_avg_f1 = np.mean([r['test_f1'] for r in all_results['KNN_標準化'].values()])
+
+knn_scaled_summary.append({
+    'Seed': 'Average',
+    'Test_ACC (%)': knn_scaled_avg_acc * 100,
+    'Test_F1 (%)': knn_scaled_avg_f1 * 100,
+    'Test_Precision (%)': np.mean([r['test_precision'] for r in all_results['KNN_標準化'].values()]) * 100,
+    'Test_Sensitivity (%)': np.mean([r['test_recall'] for r in all_results['KNN_標準化'].values()]) * 100,
+    'Test_Specificity (%)': np.mean([r['test_specificity'] for r in all_results['KNN_標準化'].values()]) * 100,
+    'Test_AUC': np.mean([r['test_auc'] for r in all_results['KNN_標準化'].values()])
+})
+
+knn_scaled_df = pd.DataFrame(knn_scaled_summary)
+print("\n" + knn_scaled_df.to_string(index=False))
+
+# KNN 標準化效果分析
+print("\n" + "=" * 80)
+print(" KNN 標準化效果分析")
+print("=" * 80)
+
+improvement_avg = knn_scaled_avg_acc - knn_orig_avg_acc
+print(f"\nKNN 原始數據平均準確率: {knn_orig_avg_acc*100:.2f}%")
+print(f"KNN 標準化數據平均準確率: {knn_scaled_avg_acc*100:.2f}%")
+print(f"平均提升幅度: {improvement_avg*100:+.2f}%")
+
+print("\n各 Seed 的提升幅度:")
+for seed in SEEDS:
+    orig = all_results['KNN_原始'][seed]['test_acc'] * 100
+    scaled = all_results['KNN_標準化'][seed]['test_acc'] * 100
+    print(f"  Seed {seed}: {orig:.2f}% → {scaled:.2f}% (提升 {scaled-orig:+.2f}%)")
+
+# ============================================================
+# 5. CART 模型 - 跑所有 Seeds
+# ============================================================
+print("\n\n" + "=" * 80)
+print("模型 2: CART (Classification and Regression Trees)")
+print("=" * 80)
+
+cart_param_grid = {
+    'criterion': ['gini'],
+    'max_depth': [3, 4, 5, 6, 7],
+    'min_samples_leaf': [1, 2, 5, 10, 15],
+    'min_samples_split': [2, 5, 10]
+}
+
+for seed in SEEDS:
+    print(f"\n{'─' * 80}")
+    print(f"Random Seed = {seed}")
+    print(f"{'─' * 80}")
     
-    # ========================================
-    # CART 模型（不需要標準化）
-    # ========================================
-    print("\n[模型 2] CART (不需標準化)")
-    print("-" * 40)
+    X_train = data_splits[seed]['X_train']
+    X_test = data_splits[seed]['X_test']
+    y_train = data_splits[seed]['y_train']
+    y_test = data_splits[seed]['y_test']
     
-    cart_param_grid = {
-        'criterion': ['gini'],
-        'max_depth': [3, 4, 5, 6, 7],
-        'min_samples_leaf': [1, 2, 5, 10, 15],
-        'min_samples_split': [2, 5, 10]
-    }
+    print(f"訓練集大小: {X_train.shape}, 測試集大小: {X_test.shape}")
     
+    # GridSearchCV
     cart_grid = GridSearchCV(
         DecisionTreeClassifier(random_state=seed),
         cart_param_grid,
@@ -272,59 +400,123 @@ for seed in SEEDS:
     cart_best_model = cart_grid.best_estimator_
     
     print(f"最佳參數: {cart_grid.best_params_}")
+    print(f"最佳 CV 分數: {cart_grid.best_score_:.4f}")
     
     # 評估
-    y_train_pred_cart = cart_best_model.predict(X_train)
-    y_test_pred_cart = cart_best_model.predict(X_test)
-    y_test_proba_cart = cart_best_model.predict_proba(X_test)[:, 1]
+    y_train_pred = cart_best_model.predict(X_train)
+    y_test_pred = cart_best_model.predict(X_test)
+    y_test_proba = cart_best_model.predict_proba(X_test)[:, 1]
     
-    cart_train_acc = accuracy_score(y_train, y_train_pred_cart)
-    cart_test_acc = accuracy_score(y_test, y_test_pred_cart)
-    cart_test_f1 = f1_score(y_test, y_test_pred_cart)
-    cart_test_pre = precision_score(y_test, y_test_pred_cart)
-    cart_test_rec = recall_score(y_test, y_test_pred_cart)
-    cart_test_auc = roc_auc_score(y_test, y_test_proba_cart)
+    train_acc = accuracy_score(y_train, y_train_pred)
+    test_acc = accuracy_score(y_test, y_test_pred)
+    test_f1 = f1_score(y_test, y_test_pred)
+    test_pre = precision_score(y_test, y_test_pred)
+    test_rec = recall_score(y_test, y_test_pred)
+    test_auc = roc_auc_score(y_test, y_test_proba)
     
-    cm_cart = confusion_matrix(y_test, y_test_pred_cart)
-    tn, fp, fn, tp = cm_cart.ravel()
-    cart_test_spe = tn / (tn + fp)
+    cm = confusion_matrix(y_test, y_test_pred)
+    tn, fp, fn, tp = cm.ravel()
+    test_spe = tn / (tn + fp)
     
-    print(f"測試集準確率: {cart_test_acc:.4f} ({cart_test_acc*100:.2f}%)")
-    print(f"測試集 F1-Score: {cart_test_f1:.4f} ({cart_test_f1*100:.2f}%)")
+    print(f"\n訓練集準確率: {train_acc:.4f} ({train_acc*100:.2f}%)")
+    print(f"測試集準確率: {test_acc:.4f} ({test_acc*100:.2f}%)")
+    print(f"測試集 F1-Score: {test_f1:.4f} ({test_f1*100:.2f}%)")
+    print(f"測試集 Precision: {test_pre:.4f} ({test_pre*100:.2f}%)")
+    print(f"測試集 Sensitivity: {test_rec:.4f} ({test_rec*100:.2f}%)")
+    print(f"測試集 Specificity: {test_spe:.4f} ({test_spe*100:.2f}%)")
+    print(f"測試集 AUC: {test_auc:.4f}")
+    
+    print(f"\n混淆矩陣:")
+    print(f"  TN={tn}, FP={fp}")
+    print(f"  FN={fn}, TP={tp}")
     
     # 特徵重要性
-    feature_importance_cart = pd.DataFrame({
+    feature_importance = pd.DataFrame({
         'Feature': X.columns,
         'Importance': cart_best_model.feature_importances_
     }).sort_values('Importance', ascending=False)
     
+    print(f"\n特徵重要性 (Top 5):")
+    print(feature_importance.head().to_string(index=False))
+    
     all_results['CART'][seed] = {
-        'train_acc': cart_train_acc,
-        'test_acc': cart_test_acc,
-        'test_f1': cart_test_f1,
-        'test_precision': cart_test_pre,
-        'test_recall': cart_test_rec,
-        'test_specificity': cart_test_spe,
-        'test_auc': cart_test_auc,
+        'train_acc': train_acc,
+        'test_acc': test_acc,
+        'test_f1': test_f1,
+        'test_precision': test_pre,
+        'test_recall': test_rec,
+        'test_specificity': test_spe,
+        'test_auc': test_auc,
         'best_params': cart_grid.best_params_,
-        'feature_importance': feature_importance_cart,
-        'confusion_matrix': cm_cart,
-        'model': cart_best_model
+        'feature_importance': feature_importance,
+        'confusion_matrix': cm,
+        'model': cart_best_model,
+        'y_test': y_test,
+        'y_test_pred': y_test_pred,
+        'y_test_proba': y_test_proba
     }
+
+# CART 結果彙整表格
+print("\n" + "=" * 80)
+print("CART 模型結果彙整")
+print("=" * 80)
+
+cart_summary = []
+for seed in SEEDS:
+    result = all_results['CART'][seed]
+    cart_summary.append({
+        'Seed': seed,
+        'Test_ACC (%)': result['test_acc'] * 100,
+        'Test_F1 (%)': result['test_f1'] * 100,
+        'Test_Precision (%)': result['test_precision'] * 100,
+        'Test_Sensitivity (%)': result['test_recall'] * 100,
+        'Test_Specificity (%)': result['test_specificity'] * 100,
+        'Test_AUC': result['test_auc']
+    })
+
+cart_avg_acc = np.mean([r['test_acc'] for r in all_results['CART'].values()])
+cart_avg_f1 = np.mean([r['test_f1'] for r in all_results['CART'].values()])
+
+cart_summary.append({
+    'Seed': 'Average',
+    'Test_ACC (%)': cart_avg_acc * 100,
+    'Test_F1 (%)': cart_avg_f1 * 100,
+    'Test_Precision (%)': np.mean([r['test_precision'] for r in all_results['CART'].values()]) * 100,
+    'Test_Sensitivity (%)': np.mean([r['test_recall'] for r in all_results['CART'].values()]) * 100,
+    'Test_Specificity (%)': np.mean([r['test_specificity'] for r in all_results['CART'].values()]) * 100,
+    'Test_AUC': np.mean([r['test_auc'] for r in all_results['CART'].values()])
+})
+
+cart_df = pd.DataFrame(cart_summary)
+print("\n" + cart_df.to_string(index=False))
+
+# ============================================================
+# 6. C4.5 模型 - 跑所有 Seeds
+# ============================================================
+print("\n\n" + "=" * 80)
+print("模型 3: C4.5 Decision Tree")
+print("=" * 80)
+
+c45_param_grid = {
+    'criterion': ['entropy'],
+    'max_depth': [3, 4, 5, 6, 7],
+    'min_samples_leaf': [1, 2, 5, 10, 15],
+    'min_samples_split': [2, 5, 10]
+}
+
+for seed in SEEDS:
+    print(f"\n{'─' * 80}")
+    print(f"Random Seed = {seed}")
+    print(f"{'─' * 80}")
     
-    # ========================================
-    # C4.5 模型（不需要標準化）
-    # ========================================
-    print("\n[模型 3] C4.5 (不需標準化)")
-    print("-" * 40)
+    X_train = data_splits[seed]['X_train']
+    X_test = data_splits[seed]['X_test']
+    y_train = data_splits[seed]['y_train']
+    y_test = data_splits[seed]['y_test']
     
-    c45_param_grid = {
-        'criterion': ['entropy'],
-        'max_depth': [3, 4, 5, 6, 7],
-        'min_samples_leaf': [1, 2, 5, 10, 15],
-        'min_samples_split': [2, 5, 10]
-    }
+    print(f"訓練集大小: {X_train.shape}, 測試集大小: {X_test.shape}")
     
+    # GridSearchCV
     c45_grid = GridSearchCV(
         DecisionTreeClassifier(random_state=seed),
         c45_param_grid,
@@ -337,205 +529,167 @@ for seed in SEEDS:
     c45_best_model = c45_grid.best_estimator_
     
     print(f"最佳參數: {c45_grid.best_params_}")
+    print(f"最佳 CV 分數: {c45_grid.best_score_:.4f}")
     
     # 評估
-    y_train_pred_c45 = c45_best_model.predict(X_train)
-    y_test_pred_c45 = c45_best_model.predict(X_test)
-    y_test_proba_c45 = c45_best_model.predict_proba(X_test)[:, 1]
+    y_train_pred = c45_best_model.predict(X_train)
+    y_test_pred = c45_best_model.predict(X_test)
+    y_test_proba = c45_best_model.predict_proba(X_test)[:, 1]
     
-    c45_train_acc = accuracy_score(y_train, y_train_pred_c45)
-    c45_test_acc = accuracy_score(y_test, y_test_pred_c45)
-    c45_test_f1 = f1_score(y_test, y_test_pred_c45)
-    c45_test_pre = precision_score(y_test, y_test_pred_c45)
-    c45_test_rec = recall_score(y_test, y_test_pred_c45)
-    c45_test_auc = roc_auc_score(y_test, y_test_proba_c45)
+    train_acc = accuracy_score(y_train, y_train_pred)
+    test_acc = accuracy_score(y_test, y_test_pred)
+    test_f1 = f1_score(y_test, y_test_pred)
+    test_pre = precision_score(y_test, y_test_pred)
+    test_rec = recall_score(y_test, y_test_pred)
+    test_auc = roc_auc_score(y_test, y_test_proba)
     
-    cm_c45 = confusion_matrix(y_test, y_test_pred_c45)
-    tn, fp, fn, tp = cm_c45.ravel()
-    c45_test_spe = tn / (tn + fp)
+    cm = confusion_matrix(y_test, y_test_pred)
+    tn, fp, fn, tp = cm.ravel()
+    test_spe = tn / (tn + fp)
     
-    print(f"測試集準確率: {c45_test_acc:.4f} ({c45_test_acc*100:.2f}%)")
-    print(f"測試集 F1-Score: {c45_test_f1:.4f} ({c45_test_f1*100:.2f}%)")
+    print(f"\n訓練集準確率: {train_acc:.4f} ({train_acc*100:.2f}%)")
+    print(f"測試集準確率: {test_acc:.4f} ({test_acc*100:.2f}%)")
+    print(f"測試集 F1-Score: {test_f1:.4f} ({test_f1*100:.2f}%)")
+    print(f"測試集 Precision: {test_pre:.4f} ({test_pre*100:.2f}%)")
+    print(f"測試集 Sensitivity: {test_rec:.4f} ({test_rec*100:.2f}%)")
+    print(f"測試集 Specificity: {test_spe:.4f} ({test_spe*100:.2f}%)")
+    print(f"測試集 AUC: {test_auc:.4f}")
+    
+    print(f"\n混淆矩陣:")
+    print(f"  TN={tn}, FP={fp}")
+    print(f"  FN={fn}, TP={tp}")
     
     # 特徵重要性
-    feature_importance_c45 = pd.DataFrame({
+    feature_importance = pd.DataFrame({
         'Feature': X.columns,
         'Importance': c45_best_model.feature_importances_
     }).sort_values('Importance', ascending=False)
     
+    print(f"\n特徵重要性 (Top 5):")
+    print(feature_importance.head().to_string(index=False))
+    
     all_results['C4.5'][seed] = {
-        'train_acc': c45_train_acc,
-        'test_acc': c45_test_acc,
-        'test_f1': c45_test_f1,
-        'test_precision': c45_test_pre,
-        'test_recall': c45_test_rec,
-        'test_specificity': c45_test_spe,
-        'test_auc': c45_test_auc,
+        'train_acc': train_acc,
+        'test_acc': test_acc,
+        'test_f1': test_f1,
+        'test_precision': test_pre,
+        'test_recall': test_rec,
+        'test_specificity': test_spe,
+        'test_auc': test_auc,
         'best_params': c45_grid.best_params_,
-        'feature_importance': feature_importance_c45,
-        'confusion_matrix': cm_c45,
-        'model': c45_best_model
+        'feature_importance': feature_importance,
+        'confusion_matrix': cm,
+        'model': c45_best_model,
+        'y_test': y_test,
+        'y_test_pred': y_test_pred,
+        'y_test_proba': y_test_proba
     }
 
-# ============================================================
-# 4. 跨 Seed 結果彙整
-# ============================================================
+# C4.5 結果彙整表格
 print("\n" + "=" * 80)
-print("跨 Seed 結果彙整")
+print("C4.5 模型結果彙整")
 print("=" * 80)
 
-# 建立彙整表格
-summary_data = []
+c45_summary = []
+for seed in SEEDS:
+    result = all_results['C4.5'][seed]
+    c45_summary.append({
+        'Seed': seed,
+        'Test_ACC (%)': result['test_acc'] * 100,
+        'Test_F1 (%)': result['test_f1'] * 100,
+        'Test_Precision (%)': result['test_precision'] * 100,
+        'Test_Sensitivity (%)': result['test_recall'] * 100,
+        'Test_Specificity (%)': result['test_specificity'] * 100,
+        'Test_AUC': result['test_auc']
+    })
 
+c45_avg_acc = np.mean([r['test_acc'] for r in all_results['C4.5'].values()])
+c45_avg_f1 = np.mean([r['test_f1'] for r in all_results['C4.5'].values()])
+
+c45_summary.append({
+    'Seed': 'Average',
+    'Test_ACC (%)': c45_avg_acc * 100,
+    'Test_F1 (%)': c45_avg_f1 * 100,
+    'Test_Precision (%)': np.mean([r['test_precision'] for r in all_results['C4.5'].values()]) * 100,
+    'Test_Sensitivity (%)': np.mean([r['test_recall'] for r in all_results['C4.5'].values()]) * 100,
+    'Test_Specificity (%)': np.mean([r['test_specificity'] for r in all_results['C4.5'].values()]) * 100,
+    'Test_AUC': np.mean([r['test_auc'] for r in all_results['C4.5'].values()])
+})
+
+c45_df = pd.DataFrame(c45_summary)
+print("\n" + c45_df.to_string(index=False))
+
+# ============================================================
+# 7. 四個模型版本綜合比較
+# ============================================================
+print("\n\n" + "=" * 80)
+print("四個模型版本綜合比較（KNN_原始、KNN_標準化、CART、C4.5）")
+print("=" * 80)
+
+# 建立綜合比較表格
+comparison_summary = []
 for model_name in ['KNN_原始', 'KNN_標準化', 'CART', 'C4.5']:
     for seed in SEEDS:
         result = all_results[model_name][seed]
-        summary_data.append({
+        comparison_summary.append({
             'Model': model_name,
             'Seed': seed,
-            'Test_ACC': result['test_acc'] * 100,
-            'Test_F1': result['test_f1'] * 100,
-            'Test_AUC': result['test_auc'] * 100
+            'Test_ACC (%)': result['test_acc'] * 100,
+            'Test_F1 (%)': result['test_f1'] * 100,
+            'Test_Precision (%)': result['test_precision'] * 100,
+            'Test_Sensitivity (%)': result['test_recall'] * 100,
+            'Test_Specificity (%)': result['test_specificity'] * 100
         })
 
-summary_df = pd.DataFrame(summary_data)
+comparison_df = pd.DataFrame(comparison_summary)
 
-# 計算平均值
-avg_data = []
+# 添加平均值
+avg_comparison = []
 for model_name in ['KNN_原始', 'KNN_標準化', 'CART', 'C4.5']:
-    model_results = summary_df[summary_df['Model'] == model_name]
-    avg_data.append({
+    model_results = comparison_df[comparison_df['Model'] == model_name]
+    avg_comparison.append({
         'Model': model_name,
         'Seed': 'Average',
-        'Test_ACC': model_results['Test_ACC'].mean(),
-        'Test_F1': model_results['Test_F1'].mean(),
-        'Test_AUC': model_results['Test_AUC'].mean()
+        'Test_ACC (%)': model_results['Test_ACC (%)'].mean(),
+        'Test_F1 (%)': model_results['Test_F1 (%)'].mean(),
+        'Test_Precision (%)': model_results['Test_Precision (%)'].mean(),
+        'Test_Sensitivity (%)': model_results['Test_Sensitivity (%)'].mean(),
+        'Test_Specificity (%)': model_results['Test_Specificity (%)'].mean()
     })
 
-avg_df = pd.DataFrame(avg_data)
-full_summary_df = pd.concat([summary_df, avg_df], ignore_index=True)
+avg_comparison_df = pd.DataFrame(avg_comparison)
+full_comparison_df = pd.concat([comparison_df, avg_comparison_df], ignore_index=True)
 
-print("\n完整結果表格:")
-print(full_summary_df.to_string(index=False))
+print("\n完整比較表格:")
+print(full_comparison_df.to_string(index=False))
 
-# ============================================================
-# 5. 標準化效果分析
-# ============================================================
-print("\n" + "=" * 80)
-print("★ 標準化效果分析")
-print("=" * 80)
-
-knn_orig_avg = avg_df[avg_df['Model'] == 'KNN_原始']['Test_ACC'].values[0]
-knn_scaled_avg = avg_df[avg_df['Model'] == 'KNN_標準化']['Test_ACC'].values[0]
-improvement_avg = knn_scaled_avg - knn_orig_avg
-
-print(f"\nKNN 原始數據平均準確率: {knn_orig_avg:.2f}%")
-print(f"KNN 標準化數據平均準確率: {knn_scaled_avg:.2f}%")
-print(f"平均提升幅度: {improvement_avg:+.2f}%")
-
-print("\n各 Seed 的提升幅度:")
-for seed in SEEDS:
-    orig = all_results['KNN_原始'][seed]['test_acc'] * 100
-    scaled = all_results['KNN_標準化'][seed]['test_acc'] * 100
-    print(f"  Seed {seed}: {orig:.2f}% → {scaled:.2f}% (提升 {scaled-orig:+.2f}%)")
+# 儲存 CSV
+full_comparison_df.to_csv('complete_results_all_seeds.csv', 
+                          index=False, encoding='utf-8-sig')
+print("\n✓ 完整結果已儲存: complete_results_all_seeds.csv")
 
 # ============================================================
-# 6. 視覺化比較
-# ============================================================
-print("\n" + "=" * 80)
-print("產生視覺化圖表")
-print("=" * 80)
-
-fig, axes = plt.subplots(2, 2, figsize=(16, 12))
-
-# 圖1: 平均準確率比較
-ax1 = axes[0, 0]
-models = ['KNN_原始', 'KNN_標準化', 'CART', 'C4.5']
-avg_accs = [avg_df[avg_df['Model'] == m]['Test_ACC'].values[0] for m in models]
-colors = ['lightcoral', 'lightgreen', 'skyblue', 'gold']
-bars = ax1.bar(models, avg_accs, color=colors, alpha=0.8, edgecolor='black')
-ax1.set_ylabel('Average Test Accuracy (%)', fontsize=12)
-ax1.set_title('模型平均準確率比較', fontsize=14, fontweight='bold')
-ax1.grid(True, alpha=0.3, axis='y')
-ax1.set_ylim([60, 80])
-# 在柱狀圖上標註數值
-for bar in bars:
-    height = bar.get_height()
-    ax1.text(bar.get_x() + bar.get_width()/2., height,
-             f'{height:.2f}%',
-             ha='center', va='bottom', fontsize=10)
-
-# 圖2: KNN 標準化前後對比
-ax2 = axes[0, 1]
-x_pos = np.arange(len(SEEDS))
-width = 0.35
-orig_accs = [all_results['KNN_原始'][s]['test_acc'] * 100 for s in SEEDS]
-scaled_accs = [all_results['KNN_標準化'][s]['test_acc'] * 100 for s in SEEDS]
-ax2.bar(x_pos - width/2, orig_accs, width, label='原始數據', alpha=0.8, color='lightcoral')
-ax2.bar(x_pos + width/2, scaled_accs, width, label='標準化數據', alpha=0.8, color='lightgreen')
-ax2.set_xlabel('Random Seed', fontsize=12)
-ax2.set_ylabel('Test Accuracy (%)', fontsize=12)
-ax2.set_title('KNN 標準化前後對比', fontsize=14, fontweight='bold')
-ax2.set_xticks(x_pos)
-ax2.set_xticklabels(SEEDS)
-ax2.legend()
-ax2.grid(True, alpha=0.3, axis='y')
-
-# 圖3: 所有模型跨 Seed 準確率
-ax3 = axes[1, 0]
-for model_name, color in zip(['KNN_原始', 'KNN_標準化', 'CART', 'C4.5'], 
-                              ['lightcoral', 'lightgreen', 'skyblue', 'gold']):
-    accs = [all_results[model_name][s]['test_acc'] * 100 for s in SEEDS]
-    ax3.plot(SEEDS, accs, marker='o', linewidth=2, markersize=8, 
-             label=model_name, color=color)
-ax3.set_xlabel('Random Seed', fontsize=12)
-ax3.set_ylabel('Test Accuracy (%)', fontsize=12)
-ax3.set_title('所有模型跨 Seed 準確率變化', fontsize=14, fontweight='bold')
-ax3.set_xticks(SEEDS)
-ax3.legend()
-ax3.grid(True, alpha=0.3)
-
-# 圖4: F1-Score 和 AUC 比較
-ax4 = axes[1, 1]
-model_names = ['KNN\n原始', 'KNN\n標準化', 'CART', 'C4.5']
-avg_f1s = [avg_df[avg_df['Model'] == m]['Test_F1'].values[0] 
-           for m in ['KNN_原始', 'KNN_標準化', 'CART', 'C4.5']]
-avg_aucs = [avg_df[avg_df['Model'] == m]['Test_AUC'].values[0] 
-            for m in ['KNN_原始', 'KNN_標準化', 'CART', 'C4.5']]
-x = np.arange(len(model_names))
-width = 0.35
-ax4.bar(x - width/2, avg_f1s, width, label='F1-Score', alpha=0.8)
-ax4.bar(x + width/2, avg_aucs, width, label='AUC', alpha=0.8)
-ax4.set_ylabel('Score (%)', fontsize=12)
-ax4.set_title('F1-Score 與 AUC 比較', fontsize=14, fontweight='bold')
-ax4.set_xticks(x)
-ax4.set_xticklabels(model_names)
-ax4.legend()
-ax4.grid(True, alpha=0.3, axis='y')
-ax4.set_ylim([50, 85])
-
-plt.tight_layout()
-plt.savefig('model_comparison_with_scaling.png', dpi=300, bbox_inches='tight')
-print("\n✓ 視覺化圖表已儲存: model_comparison_with_scaling.png")
-plt.close()
-
-# ============================================================
-# 7. 最終總結
+# 8. 最終總結
 # ============================================================
 print("\n" + "=" * 80)
 print("最終總結")
 print("=" * 80)
 
 print("\n各模型平均測試集準確率:")
+avg_accs = {}
 for model_name in ['KNN_原始', 'KNN_標準化', 'CART', 'C4.5']:
-    avg_acc = avg_df[avg_df['Model'] == model_name]['Test_ACC'].values[0]
-    print(f"  {model_name}: {avg_acc:.2f}%")
+    avg_acc = np.mean([all_results[model_name][s]['test_acc'] for s in SEEDS])
+    avg_accs[model_name] = avg_acc
+    print(f"  {model_name}: {avg_acc*100:.2f}%")
 
-print(f"\n★ 結論:")
-print(f"1. KNN 在標準化後平均提升 {improvement_avg:.2f}%")
-print(f"2. 標準化後的 KNN ({knn_scaled_avg:.2f}%) {'已接近' if knn_scaled_avg > 70 else '仍低於'} 決策樹的表現")
-print(f"3. 特徵尺度差異確實是影響 KNN 性能的關鍵因素")
+best_model = max(avg_accs, key=avg_accs.get)
+print(f"\n平均測試集準確率最佳模型: {best_model} ({avg_accs[best_model]*100:.2f}%)")
+
+print("\n重要發現:")
+print(f"1. KNN 標準化效果: 從 {avg_accs['KNN_原始']*100:.2f}% 提升到 {avg_accs['KNN_標準化']*100:.2f}% (提升 {(avg_accs['KNN_標準化']-avg_accs['KNN_原始'])*100:+.2f}%)")
+print(f"2. 決策樹方法（CART & C4.5）不受特徵尺度影響，表現穩定")
+print(f"3. 標準化後的 KNN {'已接近' if avg_accs['KNN_標準化'] > 0.70 else '仍低於'} 決策樹的表現")
 
 print("\n" + "=" * 80)
-print("分析完成!")
+print("Assignment 4 完成!")
 print("=" * 80)
