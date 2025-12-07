@@ -1,0 +1,255 @@
+================================================================================
+完整資料前處理總結 (強化版)
+================================================================================
+
+原始資料: 10000筆
+67百分位數: 84.07
+
+目標變數分布:
+  Not_High: 6700 (67.0%)
+  High: 3300 (33.0%)
+
+================================================================================
+資料品質檢查
+================================================================================
+
+NaN總數: 0
+inf總數: 0
+所有特徵都是數值型: True
+
+================================================================================
+特徵工程
+================================================================================
+
+新增衍生特徵:
+  1. Tasks_Per_Hour
+  2. Tasks_Per_Meeting
+  3. Overtime_Efficiency
+  4. Total_Work_Hours
+  5. Meeting_Burden
+  6. Overtime_Ratio
+  7. Age_Experience_Ratio
+  8. Seniority_Score
+  9. Work_Life_Score
+  10. Satisfaction_Balance
+  11. Job_Level_Numeric
+
+新特徵相關性:
+  Tasks_Per_Hour                : -0.0151
+  Meeting_Burden                : -0.0149
+  Overtime_Ratio                : -0.0128
+  Seniority_Score               : -0.0125
+  Total_Work_Hours              :  0.0115
+  Age_Experience_Ratio          :  0.0114
+  Overtime_Efficiency           :  0.0101
+  Satisfaction_Balance          : -0.0059
+  Tasks_Per_Meeting             :  0.0058
+  Job_Level_Numeric             :  0.0026
+  Work_Life_Score               :  0.0025
+
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+最終特徵
+================================================================================
+
+特徵數: 24
+
+完整特徵列表:
+  1. Age
+  2. Years_at_Company
+  3. Job_Satisfaction
+  4. Tasks_Per_Hour
+  5. Tasks_Per_Meeting
+  6. Overtime_Efficiency
+  7. Total_Work_Hours
+  8. Meeting_Burden
+  9. Overtime_Ratio
+  10. Job_Level_Numeric
+  11. Age_Experience_Ratio
+  12. Seniority_Score
+  13. Work_Life_Score
+  14. Satisfaction_Balance
+  15. Dept_HR
+  16. Dept_IT
+  17. Dept_Marketing
+  18. Dept_Operations
+  19. Dept_Sales
+  20. Remote_No
+  21. Remote_Yes
+  22. WLB_Excellent
+  23. WLB_Good
+  24. WLB_Poor
+
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+=
+移除的欄位
+================================================================================
+
+  1. Employee_ID
+  2. Productivity_Score
+  3. Annual_Salary
+  4. Absences_Per_Year
+  5. Tasks_Completed_Per_Day
+  6. Monthly_Hours_Worked
+  7. Meetings_per_Week
+  8. Overtime_Hours_Per_Week
+  9. Department
+  10. Remote_Work
+  11. Work_Life_Balance
+  12. Job_Level
